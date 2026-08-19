@@ -118,20 +118,20 @@ assets:
     - "^glow_.*_Linux_x86_64\\.tar\\.gz$"
   linux/arm64:
     - "^glow_.*_Linux_arm64\\.tar\\.gz$"
-  # ── Pass 2 (darwin) ────────────────────────────────────────────────────────
+  # ── Pass 2 (darwin) — LANDED ───────────────────────────────────────────────
   # Uncommented together with the matching `platforms:` keys in
   # ../mirror-base.yml, never on their own.
-  # darwin/amd64:
-  #   - "^glow_.*_Darwin_x86_64\\.tar\\.gz$"
-  # darwin/arm64:
-  #   - "^glow_.*_Darwin_arm64\\.tar\\.gz$"
+  darwin/amd64:
+    - "^glow_.*_Darwin_x86_64\\.tar\\.gz$"
+  darwin/arm64:
+    - "^glow_.*_Darwin_arm64\\.tar\\.gz$"
   #
-  # ── Pass 3 (windows) ───────────────────────────────────────────────────────
+  # ── Pass 3 (windows) — LANDED ──────────────────────────────────────────────
   # `.zip` rather than `.tar.gz`, holding `glow.exe` inside the SAME one-level
   # wrapper directory — so `strip_components: 1` covers it and there is no
   # metadata-windows.json.
-  # windows/amd64:
-  #   - "^glow_.*_Windows_x86_64\\.zip$"
+  windows/amd64:
+    - "^glow_.*_Windows_x86_64\\.zip$"
 
 asset_type:
   # Wrapper-directory archive on every platform (transcript above). The wrapper
