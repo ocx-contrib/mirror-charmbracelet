@@ -1,0 +1,198 @@
+# ⚠ `extends:` is a SHALLOW merge of TOP-LEVEL KEYS. Setting a key here
+# REPLACES the base's block outright — there is no per-key merge. `platforms:`
+# is deliberately NOT restated below: it carries the container legs that make
+# this spec's bare Linux keys honest, and restating it to tweak one runner
+# would drop them all without reddening anything. gum and glow measured to the
+# same platform shape, so the matrix lives in the base and nothing here touches
+# it.
+extends: ../mirror-base.yml
+
+name: gum
+
+# Logical index package `charm/gum` at the physical path
+# `ghcr.io/ocx-contrib/charm/gum` — slash segments, never hyphen-flattened.
+# Two segments always. The namespace is the VENDOR, not the GitHub org handle:
+# the company is Charm (charm.sh / charm.land), `charmbracelet` is only the
+# handle it registered, and its own artwork brands this tool `charm_ gum`.
+# Same rule that makes `github/cli` not `cli/cli` and `amazon/corretto` not
+# `corretto/corretto` (skill Phase 1 rule 3). Provenance is not lost by that —
+# it is recorded verifiably in the claim's `upstream` block. The first segment
+# of `repository` must be this repo's own GitHub owner: GITHUB_TOKEN only
+# authorises packages owned by the repo the workflow runs in.
+target:
+  registry: ghcr.io
+  repository: ocx-contrib/charm/gum
+
+source:
+  type: github_release
+  owner: charmbracelet
+  repo: gum
+  # gum tags carry a "v" prefix (e.g. "v0.17.0"); the captured version does
+  # not — the asset FILENAMES spell it without the v (`gum_0.17.0_…`), so the
+  # two must not be conflated. Verified against every tag back to v0.1.0: the
+  # scheme is uniform bare `vMAJOR.MINOR.PATCH` with no rc/beta suffix, and
+  # gum publishes no prerelease tags at all (unlike its sibling crush, whose
+  # rolling `nightly` tag is what `skip_prereleases` in the base is for).
+  tag_pattern: "^v(?P<version>\\d+\\.\\d+\\.\\d+)$"
+
+# ─── libc gate (Phase 3.5) — the evidence, not the conclusion ───────────────
+#
+# `os.features` states what an artifact REQUIRES OF THE HOST. gum is pure Go
+# with no cgo, so upstream ships one Linux binary per arch with no musl/gnu
+# split. Measured on ALL FOUR declared Linux artifacts at BOTH ends of the
+# mirrored range (2 arches × 0.16.0 and 0.17.0), not just the newest:
+#
+#   $ file gum                           # 0.17.0 Linux_x86_64
+#   ELF 64-bit LSB executable, x86-64, version 1 (SYSV), statically linked,
+#   BuildID[sha1]=1766e0da…, stripped
+#   $ file gum                           # 0.17.0 Linux_arm64
+#   ELF 64-bit LSB executable, ARM aarch64, version 1 (SYSV), statically
+#   linked, BuildID[sha1]=49e3c2d3…, stripped
+#   $ readelf -l gum | grep -c INTERP  → 0   (all four)
+#   $ readelf -d gum | grep -c NEEDED  → 0   (all four)
+#
+#     ⇒ requires NOTHING of the host → BARE `linux/amd64` and `linux/arm64`.
+#       The alpine container leg in ../mirror-base.yml is what turns that
+#       universality claim into evidence.
+#
+# Cross-checked against the UPX trap, which makes a packed glibc-dynamic binary
+# read as "statically linked" because the packer stub carries no PT_INTERP and
+# no section headers:
+#
+#   $ strings -a gum | grep -c '^UPX'          → 0   (all four)
+#   $ readelf -h gum | grep 'section headers'  → 400 (bytes into file, all four)
+#
+# Not packed, and section headers are present — so `file`'s answer is the real
+# ELF's, not a stub's.
+#
+# ─── Archive layout: WRAPPER DIRECTORY on every platform ───────────────────
+#
+# Every archive — tar.gz and zip alike — wraps seven entries in ONE top
+# directory named `gum_<version>_<Os>_<arch>`. Verified on 0.16.0 and 0.17.0,
+# linux amd64 + linux arm64 + darwin amd64 + darwin arm64 + windows:
+#
+#   $ tar tzf gum_0.17.0_Linux_x86_64.tar.gz
+#   gum_0.17.0_Linux_x86_64/LICENSE
+#   gum_0.17.0_Linux_x86_64/README.md
+#   gum_0.17.0_Linux_x86_64/completions/gum.{bash,fish,zsh}
+#   gum_0.17.0_Linux_x86_64/manpages/gum.1.gz
+#   gum_0.17.0_Linux_x86_64/gum                       ← mode 0755
+#   $ unzip -l gum_0.17.0_Windows_x86_64.zip          → same 7, `gum.exe` last
+#
+# No entry carries a leading `./`, so the wrapper is exactly ONE path component
+# in both the tar and the zip reader (a `./` prefix would count as a component
+# in tar and not in zip, making the two counts differ by one). Hence
+# `strip_components: 1` below, uniformly.
+#
+# THIS IS THE FLOOR-SETTING FACT: v0.13.0 and earlier are FLAT — `gum`,
+# `LICENSE`, `README.md` at the archive root with no wrapper — and the
+# transition happened at v0.14.0:
+#
+#   $ tar tzf gum_0.13.0_Linux_x86_64.tar.gz   → LICENSE, README.md, …, gum
+#   $ tar tzf gum_0.14.0_Linux_x86_64.tar.gz   → gum_0.14.0_Linux_x86_64/…
+#
+# `asset_type` has no per-version axis, so one spec cannot serve both layouts:
+# `strip_components: 1` on a 0.13.0 archive would DELETE its first entry and
+# hoist the rest. 0.14.0 is therefore a HARD floor beneath the catalog floor
+# chosen below, not a preference.
+#
+# ─── Scope + resolution (verified on EVERY in-range release) ────────────────
+#
+# The mirrored range is exactly v0.16.0, v0.16.1, v0.16.2, v0.17.0 — four
+# releases. Each pattern below was matched against each release's FULL asset
+# list (68 entries on every one of the four): EXACTLY ONE match, every time,
+# both ways. A pattern matching zero is silently skipped rather than an error,
+# which would yield a green run with a missing platform.
+#
+# Upstream also publishes, and this mirror deliberately does not carry:
+#   gum_<V>_{Linux,Windows,Freebsd,Netbsd,Openbsd}_i386.*  — ocx has no 386
+#   gum_<V>_Linux_armv{6,7}.tar.gz                          — ocx has no 32-bit arm
+#   gum_<V>_{Freebsd,Netbsd,Openbsd}_*.tar.gz               — not ocx OSes
+#   gum-<V>-1.*.rpm · gum_<V>_*.deb · gum_<V>_*.apk         — distro packages
+#   gum-<V>.tar.gz                                          — SOURCE tarball
+#   checksums.txt{,.pem,.sig}                               — sidecars
+# There is no `Windows_arm64` asset in ANY gum release (checked with
+# `--paginate` across all 26 tags), so that platform is a measured absence.
+#
+# THE SIDECAR TRAP HERE: every archive has a `<name>.sbom.json` sibling (and a
+# bare `<name>.sbom` at v0.14.x), so an unanchored pattern would match TWO
+# assets and fail as ambiguous. Every pattern is anchored at BOTH ends and pins
+# the extension. Anchoring is also what keeps `_Linux_arm64` from matching
+# `_Linux_armv6`/`_Freebsd_arm64`, and `_Linux_x86_64` from matching
+# `_Freebsd_x86_64`.
+assets:
+  linux/amd64:
+    - "^gum_.*_Linux_x86_64\\.tar\\.gz$"
+  linux/arm64:
+    - "^gum_.*_Linux_arm64\\.tar\\.gz$"
+  # ── Pass 2 (darwin) ────────────────────────────────────────────────────────
+  # Uncommented together with the matching `platforms:` keys in
+  # ../mirror-base.yml, never on their own. Both darwin archives carry the same
+  # wrapper-directory layout (verified on 0.16.0 and 0.17.0), so no
+  # per-platform asset_type override and no metadata-darwin.json.
+  # darwin/amd64:
+  #   - "^gum_.*_Darwin_x86_64\\.tar\\.gz$"
+  # darwin/arm64:
+  #   - "^gum_.*_Darwin_arm64\\.tar\\.gz$"
+  #
+  # ── Pass 3 (windows) ───────────────────────────────────────────────────────
+  # The Windows asset is a `.zip`, not a `.tar.gz`, and holds `gum.exe` inside
+  # the SAME one-level wrapper directory — so `strip_components: 1` covers it
+  # too and there is no metadata-windows.json.
+  # windows/amd64:
+  #   - "^gum_.*_Windows_x86_64\\.zip$"
+
+asset_type:
+  # Wrapper-directory archive on every platform (transcript above). The wrapper
+  # name embeds BOTH the version and the platform, so it cannot appear in a
+  # static metadata.json PATH: `strip_components: 0` would demand
+  # `${installPath}/gum_0.17.0_Linux_x86_64`, different for every tile.
+  # Stripping the one wrapper component lands `gum` at the CONTENT ROOT and
+  # makes PATH a bare `${installPath}` — which is why `bin_scan` is `off` in
+  # ../mirror-base.yml with `binaries` hand-listed in metadata.json.
+  type: archive
+  strip_components: 1
+
+metadata:
+  # Resolves against THIS spec's directory (unlike `tests[].script` below).
+  default: metadata.json
+
+catalog:
+  logo: logo.svg
+
+versions:
+  # 0.16.0 is the CATALOG floor: the current train, four releases spanning
+  # 2025-03 → 2025-09, rather than backfilling three years of tags. It is not
+  # the hard floor — that is 0.14.0, set by the flat→wrapper archive change
+  # documented above, and 0.16.0 sits safely above it.
+  #
+  # The choice is also what makes the smoke test's negative control assertable:
+  # `gum version-check` did not exist before 0.15.0, and the unknown-flag exit
+  # code moved from 1 to 80 inside 0.16.x. Measured on all four in-range
+  # versions, uniformly: version-check '>=0.1.0' → 0, '>=99.0.0' → 1.
+  min: "0.16.0"
+  new_per_run: 5
+  # Hash-staggered, never a hand-picked minute:
+  #   $ python3 .claude/skills/create-mirror/scripts/poll_stagger.py charm/gum
+  #   slot: 266  (minute=26, hour-offset=4)   cron: 26 4-23/6 * * *
+  # Fleet-synchronized crons burst-pushed to GHCR together and tripped its
+  # secondary rate limit on 2026-08-04.
+  poll_interval: "26 4-23/6 * * *"
+
+tests:
+  # `script:` resolves from the REPOSITORY ROOT — unlike `metadata.default` and
+  # `catalog.logo` above, which resolve against this spec's own directory.
+  - name: smoke
+    script: gum/tests/smoke.star
+
+annotations:
+  # From the Phase 1.5 license gate:
+  #   $ gh api repos/charmbracelet/gum/license --jq '.license.spdx_id'
+  #   MIT
+  org.opencontainers.image.licenses: "MIT"
+
+announce:
+  # Spelled out, not derived from target.repository — the logical name and the
+  # physical path are related by convention only.
+  package: charm/gum
+  fork: ocx-contrib/index

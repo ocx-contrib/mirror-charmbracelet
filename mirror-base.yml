@@ -1,0 +1,139 @@
+# Shared base for every spec in this repository — the CLI tools published by
+# Charm (charm.sh), the vendor behind Bubble Tea and Lip Gloss. The GitHub org
+# handle is `charmbracelet`; the vendor calls itself Charm, and the vendor
+# identity is what the namespace carries (skill Phase 1 rule 3, the same reason
+# `github/cli` is not `cli/cli` and `amazon/corretto` is not `corretto/…`).
+#
+# NOT a spec: it has no name/target/source and is never loaded on its own.
+# Everything a package owns — name, target, source, assets, asset_type,
+# metadata, catalog, tests, versions, announce, annotations — stays in that
+# package's own mirror.yml.
+#
+# ⚠️ `extends:` is a SHALLOW merge of top-level keys. A spec that sets a key
+# below replaces that block OUTRIGHT — there is no per-key merge. `platforms:`
+# is where this bites: it carries BOTH the runner matrix and the container
+# legs, so a child that restates it to tweak one runner silently drops every
+# `containers:` entry. Nothing reds — the legs simply stop existing, and every
+# os.features claim in that spec goes back to being merely asserted. Restate
+# `platforms:` IN FULL or not at all. Neither gum/mirror.yml nor
+# glow/mirror.yml restates it, and that is deliberate: both packages measured
+# to the SAME shape (see below), so there is nothing for a child to tweak.
+
+skip_prereleases: true
+cascade: true
+
+# Both packages tag bare semver (`0.17.0`, `3.0.0`) with no `+build` segment,
+# so the fleet default applies with no exception. A cascade tag (`latest`, `0`,
+# `0.17`) re-points on every re-publish; without a build segment the new
+# manifest would reuse the bare version tag and orphan the prior digest for
+# registry GC, breaking any `@sha256:` pin in a consumer's ocx.lock.
+build_timestamp: date
+
+verify:
+  github_asset_digest: true
+
+concurrency:
+  # Each asset is a 4–7 MB tar.gz/zip wrapping a 13–25 MB static Go binary, so
+  # bundling is recompression-dominated. Five platforms × four versions.
+  max_downloads: 6
+  max_bundles: 3
+  max_pushes: 2
+  rate_limit_ms: 100
+  max_retries: 3
+  compression_threads: 0
+
+# `bin_scan` is FORCED off, not chosen — and for a different reason than the
+# flat-archive mirrors in this fleet. Every Charm goreleaser archive wraps its
+# contents in a top directory whose name embeds BOTH the version and the
+# platform (`gum_0.17.0_Linux_x86_64/`, `glow_3.0.0_Darwin_arm64/`), so
+# `strip_components: 0` would make PATH `${installPath}/gum_0.17.0_Linux_x86_64`
+# — a value that cannot be written in a static metadata.json at all, since it
+# changes with every version and every platform. `strip_components: 1` is
+# therefore forced, which lands the binary at the CONTENT ROOT and makes PATH a
+# bare `${installPath}`.
+#
+# The scan only inspects an interface-visible `${installPath}/<dir>` PATH
+# entry, so with no subdirectory to point at both `auto` and `verify` fail spec
+# load at exit 65 ("bin_scan is enabled but … declares no interface-visible
+# ${installPath}/<dir> PATH entry"). `off` with a hand-listed `binaries` in each
+# package's metadata.json is what that error itself directs. Each package ships
+# exactly one executable, taken from the archive listing above its spec's
+# `assets:` — not from a README.
+#
+# Quoted so no YAML 1.1 reader folds the bare word into boolean `false`.
+bin_scan: "off"
+
+# ─── Platform matrix ────────────────────────────────────────────────────────
+#
+# `os.features` states what an artifact REQUIRES OF THE HOST — it is not a
+# label for how it was built. gum and glow are both pure Go with no cgo, and
+# upstream ships one Linux binary per arch with no musl/gnu split. Measured on
+# the declared Linux artifacts at BOTH ends of BOTH mirrored ranges — gum
+# 0.16.0 and 0.17.0 × amd64/arm64, glow 2.1.0 and 3.0.0 × amd64/arm64 (plus
+# glow amd64 at 2.1.1 and 2.1.2); the transcripts are recorded above each
+# spec's `assets:`. Every artifact: `statically linked`, no PT_INTERP, no
+# DT_NEEDED, no UPX stub, section headers present.
+#
+# So both Linux keys are BARE on both packages. `+libc.glibc` would hide them
+# from Alpine; `+libc.musl` would hide them from every glibc host they in fact
+# run on.
+#
+# A bare key claims universality, so it must prove it: ubuntu (glibc) + alpine
+# (musl) + fedora (a different glibc vintage). The ALPINE LEG IS THE PROOF —
+# drop it and the universal claim is merely asserted.
+#
+# No `containers[].setup` anywhere: a static Go binary loads on a stock image
+# by definition, and the smoke tests touch nothing outside the bundle (gum's
+# verbs are pure string rendering and semver arithmetic; glow renders a
+# markdown file written into the scratch root). A `setup:` line here would
+# provision a dependency no assertion reaches.
+platforms:
+  linux/amd64:
+    runner: ubuntu-latest
+    containers: &linux_containers
+      - { image: "ubuntu:24.04", shell: bash }
+      - { image: "alpine:3.20", shell: sh }
+      - { image: "fedora:40", shell: bash }
+  linux/arm64:
+    # arm64 container legs run natively — no qemu — so the runner arch must
+    # match the platform or the renderer reds the leg up front. The container
+    # set is the same three images, aliased rather than copied so the two
+    # arches can never drift apart.
+    runner: ubuntu-24.04-arm
+    containers: *linux_containers
+  # No `containers:` on darwin or windows — those runners have no Linux
+  # container engine, and the key is rejected at spec load.
+  #
+  # ── Pass 2 (darwin) ────────────────────────────────────────────────────────
+  # Kept commented in lockstep with the matching `assets:` keys in BOTH
+  # gum/mirror.yml and glow/mirror.yml. Staging `assets:` ALONE would not save
+  # runner minutes: a platform with no resolvable asset self-skips per VERSION
+  # but still boots a real macOS/Windows runner and reports SUCCESS having
+  # tested nothing. So the platform key and its asset regexes are uncommented
+  # in the SAME pass.
+  # darwin/amd64:
+  #   # Intel slice tested on the arm64 macos-14 runner via Rosetta 2 —
+  #   # GitHub's native macos-13 Intel pool is exhausted and deadlocks push.
+  #   runner: macos-14
+  #   prefix: ["arch", "-x86_64"]
+  # darwin/arm64:
+  #   runner: macos-14
+  #   shell: bash
+  #
+  # ── Pass 3 (windows) ───────────────────────────────────────────────────────
+  # windows/amd64:
+  #   runner: windows-latest
+  #   shell: pwsh
+  #
+  # There is no `windows/arm64` pass. Upstream has never shipped one for either
+  # package — checked across EVERY gum and glow release, not just the newest:
+  #   $ gh api "repos/charmbracelet/gum/releases?per_page=100" --paginate \
+  #       --jq '.[].assets[].name' | grep -iE 'windows.*arm' | sort -u
+  #   (no output)
+  # Upstream's Windows matrix is `Windows_i386` + `Windows_x86_64` only, and
+  # ocx has no 386 architecture. This is a measured absence, not an omission.
+
+notify:
+  discord:
+    webhook_secret: OCX_MIRROR_DISCORD_HOOK
+    user_id: "227748867204972545"  # pinged in-message on failures

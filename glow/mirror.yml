@@ -1,0 +1,180 @@
+# ⚠ `extends:` is a SHALLOW merge of TOP-LEVEL KEYS. Setting a key here
+# REPLACES the base's block outright — there is no per-key merge. `platforms:`
+# is deliberately NOT restated below: it carries the container legs that make
+# this spec's bare Linux keys honest, and restating it to tweak one runner
+# would drop them all without reddening anything. gum and glow measured to the
+# same platform shape, so the matrix lives in the base and nothing here touches
+# it.
+extends: ../mirror-base.yml
+
+name: glow
+
+# Logical index package `charm/glow` at the physical path
+# `ghcr.io/ocx-contrib/charm/glow`. Same namespace as `charm/gum` — the vendor
+# is Charm (charm.sh / charm.land); `charmbracelet` is only its GitHub handle
+# (skill Phase 1 rule 3). Because `charm/gum` is claimed in the same index PR,
+# the namespace is claimed by whichever of the two files a maintainer merges
+# first — there is no separate reservation step, and G-04 still labels each new
+# `p/charm/*.json` file for human review regardless.
+target:
+  registry: ghcr.io
+  repository: ocx-contrib/charm/glow
+
+source:
+  type: github_release
+  owner: charmbracelet
+  repo: glow
+  # glow tags carry a "v" prefix (e.g. "v3.0.0"); the captured version does
+  # not — the asset FILENAMES spell it without the v (`glow_3.0.0_…`). Verified
+  # against all 24 tags back to v0.1.0: uniform bare `vMAJOR.MINOR.PATCH`, and
+  # glow publishes NO prerelease tags at all (`.[]|select(.prerelease)` returns
+  # nothing), so `skip_prereleases` in the base is a no-op here rather than a
+  # load-bearing filter.
+  tag_pattern: "^v(?P<version>\\d+\\.\\d+\\.\\d+)$"
+
+# ─── libc gate (Phase 3.5) — the evidence, not the conclusion ───────────────
+#
+# `os.features` states what an artifact REQUIRES OF THE HOST. glow is pure Go
+# with no cgo, so upstream ships one Linux binary per arch with no musl/gnu
+# split. Measured on ALL FOUR declared Linux artifacts at BOTH ends of the
+# mirrored range (2 arches × 2.1.0 and 3.0.0 — deliberately spanning the v3
+# MAJOR bump, where a toolchain change would most plausibly land), plus amd64
+# at the two interior versions 2.1.1 and 2.1.2:
+#
+#   $ file glow                          # 3.0.0 Linux_x86_64
+#   ELF 64-bit LSB executable, x86-64, version 1 (SYSV), statically linked,
+#   Go BuildID=aGl71Mum…, BuildID[sha1]=00dd6258…, stripped
+#   $ file glow                          # 3.0.0 Linux_arm64
+#   ELF 64-bit LSB executable, ARM aarch64, version 1 (SYSV), statically
+#   linked, Go BuildID=H68tQVU4…, BuildID[sha1]=4bae0a0b…, stripped
+#   $ readelf -l glow | grep -c INTERP  → 0   (all six measured)
+#   $ readelf -d glow | grep -c NEEDED  → 0   (all six measured)
+#
+#     ⇒ requires NOTHING of the host → BARE `linux/amd64` and `linux/arm64`.
+#       The alpine container leg in ../mirror-base.yml is what turns that
+#       universality claim into evidence.
+#
+# Cross-checked against the UPX trap (a packed glibc-dynamic binary also reads
+# as "statically linked", because the packer stub carries no PT_INTERP and no
+# section headers):
+#
+#   $ strings -a glow | grep -c '^UPX'          → 0   (all six)
+#   $ readelf -h glow | grep 'section headers'  → 400 (bytes into file)
+#
+# ─── Archive layout: WRAPPER DIRECTORY on every platform ───────────────────
+#
+# Identical shape to charm/gum — both come off the same goreleaser config.
+# Every archive wraps seven entries in ONE top directory named
+# `glow_<version>_<Os>_<arch>`. Verified on 2.0.0, 2.1.0, 2.1.1, 2.1.2 and
+# 3.0.0, i.e. across the v3 major bump and one release BELOW the floor:
+#
+#   $ tar tzf glow_3.0.0_Linux_x86_64.tar.gz
+#   glow_3.0.0_Linux_x86_64/LICENSE
+#   glow_3.0.0_Linux_x86_64/README.md
+#   glow_3.0.0_Linux_x86_64/completions/glow.{bash,fish,zsh}
+#   glow_3.0.0_Linux_x86_64/manpages/glow.1.gz
+#   glow_3.0.0_Linux_x86_64/glow
+#
+# No entry carries a leading `./`, so the wrapper is exactly ONE path component
+# in both the tar and the zip reader. Hence `strip_components: 1` below.
+#
+# Unlike gum, glow's floor is NOT forced by a layout change — 2.0.0 already has
+# the wrapper. The floor below is a pure catalog-scope choice.
+#
+# ─── Scope + resolution (verified on EVERY in-range release) ────────────────
+#
+# The mirrored range is exactly v2.1.0, v2.1.1, v2.1.2, v3.0.0 — four releases.
+# Each pattern below was matched against each release's FULL asset list (57,
+# 57, 56, 56 entries): EXACTLY ONE match, every time, both ways. A pattern
+# matching zero is silently skipped rather than an error, which would yield a
+# green run with a missing platform.
+#
+# Upstream also publishes, and this mirror deliberately does not carry:
+#   glow_<V>_{Linux,Windows,Freebsd,Netbsd,Openbsd}_i386.*  — ocx has no 386
+#   glow_<V>_{Linux,Freebsd,Netbsd,Openbsd}_arm.tar.gz      — ocx has no 32-bit arm
+#   glow_<V>_{Freebsd,Netbsd,Openbsd}_*.tar.gz              — not ocx OSes
+#   glow-<V>-1.*.rpm · glow_<V>_*.deb · glow_<V>_*.apk      — distro packages
+#   glow-<V>.tar.gz                                         — SOURCE tarball
+#   checksums.txt{,.pem,.sig} · checksums.txt.sigstore.json — sidecars
+# (v2.1.x signs with a cosign .pem/.sig pair, v3.0.0 with a single
+# `checksums.txt.sigstore.json` — which is why the in-range asset counts differ
+# by one and why no pattern here may rely on a fixed total.)
+# There is no `Windows_arm64` asset in ANY glow release, so that platform is a
+# measured absence rather than an omission.
+#
+# TWO TRAPS THIS ANCHORING DEFEATS: the SOURCE tarball is `glow-<V>.tar.gz`
+# with a HYPHEN where the platform archives use an underscore, so `^glow_`
+# excludes it structurally; and every archive has a `.sbom.json` sibling, so an
+# unanchored pattern would match two assets and fail as ambiguous. Anchoring is
+# also what keeps `_Linux_arm64` from matching `_Linux_arm`/`_Freebsd_arm64`.
+assets:
+  linux/amd64:
+    - "^glow_.*_Linux_x86_64\\.tar\\.gz$"
+  linux/arm64:
+    - "^glow_.*_Linux_arm64\\.tar\\.gz$"
+  # ── Pass 2 (darwin) ────────────────────────────────────────────────────────
+  # Uncommented together with the matching `platforms:` keys in
+  # ../mirror-base.yml, never on their own.
+  # darwin/amd64:
+  #   - "^glow_.*_Darwin_x86_64\\.tar\\.gz$"
+  # darwin/arm64:
+  #   - "^glow_.*_Darwin_arm64\\.tar\\.gz$"
+  #
+  # ── Pass 3 (windows) ───────────────────────────────────────────────────────
+  # `.zip` rather than `.tar.gz`, holding `glow.exe` inside the SAME one-level
+  # wrapper directory — so `strip_components: 1` covers it and there is no
+  # metadata-windows.json.
+  # windows/amd64:
+  #   - "^glow_.*_Windows_x86_64\\.zip$"
+
+asset_type:
+  # Wrapper-directory archive on every platform (transcript above). The wrapper
+  # name embeds BOTH the version and the platform, so `strip_components: 0`
+  # would demand a PATH of `${installPath}/glow_3.0.0_Linux_x86_64` — different
+  # for every tile and unwritable in a static metadata.json. Stripping the one
+  # wrapper component lands `glow` at the CONTENT ROOT, which is why `bin_scan`
+  # is `off` in ../mirror-base.yml with `binaries` hand-listed.
+  type: archive
+  strip_components: 1
+
+metadata:
+  default: metadata.json
+
+catalog:
+  logo: logo.svg
+
+versions:
+  # 2.1.0 is a pure CATALOG-SCOPE floor — nothing in the asset naming or the
+  # archive layout forces it (2.0.0 is identical in both). Four releases
+  # spanning 2025-02 → 2026-08, deliberately including the v3.0.0 MAJOR bump so
+  # the catalog holds both trains.
+  #
+  # It is also the floor at which the smoke test's assertions hold uniformly:
+  # measured on all four, glow's markdown renderer turns `- item` into
+  # `• item` and keeps `# Title` verbatim, while v3.0.0 changed LINK rendering
+  # to OSC 8 terminal hyperlinks — which is why nothing below asserts on links.
+  min: "2.1.0"
+  new_per_run: 5
+  # Hash-staggered, never a hand-picked minute:
+  #   $ python3 .claude/skills/create-mirror/scripts/poll_stagger.py charm/glow
+  #   slot: 29  (minute=29, hour-offset=0)   cron: 29 0-23/6 * * *
+  # Note this lands in a different 6h slot than charm/gum's `26 4-23/6` — the
+  # stagger is per-package precisely so two packages in one repo never push to
+  # GHCR together.
+  poll_interval: "29 0-23/6 * * *"
+
+tests:
+  # `script:` resolves from the REPOSITORY ROOT — unlike `metadata.default` and
+  # `catalog.logo` above, which resolve against this spec's own directory.
+  - name: smoke
+    script: glow/tests/smoke.star
+
+annotations:
+  # From the Phase 1.5 license gate:
+  #   $ gh api repos/charmbracelet/glow/license --jq '.license.spdx_id'
+  #   MIT
+  org.opencontainers.image.licenses: "MIT"
+
+announce:
+  package: charm/glow
+  fork: ocx-contrib/index
