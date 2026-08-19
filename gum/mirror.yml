@@ -9,19 +9,36 @@ extends: ../mirror-base.yml
 
 name: gum
 
-# Logical index package `charm/gum` at the physical path
-# `ghcr.io/ocx-contrib/charm/gum` — slash segments, never hyphen-flattened.
-# Two segments always. The namespace is the VENDOR, not the GitHub org handle:
-# the company is Charm (charm.sh / charm.land), `charmbracelet` is only the
-# handle it registered, and its own artwork brands this tool `charm_ gum`.
-# Same rule that makes `github/cli` not `cli/cli` and `amazon/corretto` not
-# `corretto/corretto` (skill Phase 1 rule 3). Provenance is not lost by that —
-# it is recorded verifiably in the claim's `upstream` block. The first segment
-# of `repository` must be this repo's own GitHub owner: GITHUB_TOKEN only
-# authorises packages owned by the repo the workflow runs in.
+# Logical index package `charmbracelet/gum` at the physical path
+# `ghcr.io/ocx-contrib/charmbracelet/gum` — slash segments, never
+# hyphen-flattened. Two segments always.
+#
+# The namespace is `charmbracelet`, NOT the shorter vendor brand `charm`, and
+# that is a deliberate reversal. The vendor-beats-handle rule (skill Phase 1
+# rule 3) would argue for `charm`: the company calls itself Charm, holds
+# charm.sh and charm.land, and its own artwork brands this tool `charm_ gum`.
+# But the index's namespace policy prefers a namespace matching "a GitHub org
+# the vendor controls, or another online identity the vendor demonstrably
+# holds" — and `github.com/charm` is an UNRELATED dormant org (created
+# 2018-05-10, four repos, none of them Charm's):
+#
+#   $ gh api users/charm --jq '{login,type,created_at,public_repos}'
+#   {"login":"charm","type":"Organization","created_at":"2018-05-10T01:14:46Z",
+#    "public_repos":4}
+#   $ gh api users/charm/repos --jq '.[].full_name'
+#   charm/bedrock · charm/FileHider-for-mac · charm/rails-handbook · charm/tabler
+#
+# Every fleet precedent for vendor-beats-handle (`github/cli`, `gitlab/glab`,
+# `amazon/corretto`) names a handle the vendor actually owns. `charm` does not
+# clear that bar, so the org handle wins here. Provenance and branding are not
+# lost — they are recorded in the claim's `upstream` block and in CATALOG.md.
+#
+# The first segment of `repository` must be this repo's own GitHub owner:
+# GITHUB_TOKEN only authorises packages owned by the repo the workflow runs
+# in.
 target:
   registry: ghcr.io
-  repository: ocx-contrib/charm/gum
+  repository: ocx-contrib/charmbracelet/gum
 
 source:
   type: github_release
@@ -173,11 +190,13 @@ versions:
   min: "0.16.0"
   new_per_run: 5
   # Hash-staggered, never a hand-picked minute:
-  #   $ python3 .claude/skills/create-mirror/scripts/poll_stagger.py charm/gum
-  #   slot: 266  (minute=26, hour-offset=4)   cron: 26 4-23/6 * * *
+  #   $ python3 .claude/skills/create-mirror/scripts/poll_stagger.py charmbracelet/gum
+  #   slot: 38  (minute=38, hour-offset=0)   cron: 38 0-23/6 * * *
+  # The slot is a hash of the LOGICAL PACKAGE NAME, so renaming the namespace
+  # moved it — recomputed, not carried over.
   # Fleet-synchronized crons burst-pushed to GHCR together and tripped its
   # secondary rate limit on 2026-08-04.
-  poll_interval: "26 4-23/6 * * *"
+  poll_interval: "38 0-23/6 * * *"
 
 tests:
   # `script:` resolves from the REPOSITORY ROOT — unlike `metadata.default` and
@@ -194,5 +213,5 @@ annotations:
 announce:
   # Spelled out, not derived from target.repository — the logical name and the
   # physical path are related by convention only.
-  package: charm/gum
+  package: charmbracelet/gum
   fork: ocx-contrib/index

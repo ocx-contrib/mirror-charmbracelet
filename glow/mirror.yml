@@ -9,16 +9,21 @@ extends: ../mirror-base.yml
 
 name: glow
 
-# Logical index package `charm/glow` at the physical path
-# `ghcr.io/ocx-contrib/charm/glow`. Same namespace as `charm/gum` — the vendor
-# is Charm (charm.sh / charm.land); `charmbracelet` is only its GitHub handle
-# (skill Phase 1 rule 3). Because `charm/gum` is claimed in the same index PR,
-# the namespace is claimed by whichever of the two files a maintainer merges
-# first — there is no separate reservation step, and G-04 still labels each new
-# `p/charm/*.json` file for human review regardless.
+# Logical index package `charmbracelet/glow` at the physical path
+# `ghcr.io/ocx-contrib/charmbracelet/glow`. Same namespace as
+# `charmbracelet/gum`, and the reasoning for preferring the ORG HANDLE over the
+# shorter vendor brand `charm` is written out in full above gum/mirror.yml's
+# `target:` — in short, `github.com/charm` belongs to an unrelated dormant org,
+# so `charm` fails the index policy's "an identity the vendor demonstrably
+# holds" test that `github/cli` and `amazon/corretto` pass.
+#
+# Because `charmbracelet/gum` is claimed in the same index PR, the namespace is
+# claimed by whichever of the two files a maintainer merges first — there is no
+# separate reservation step, and G-04 still labels each new
+# `p/charmbracelet/*.json` file for human review regardless.
 target:
   registry: ghcr.io
-  repository: ocx-contrib/charm/glow
+  repository: ocx-contrib/charmbracelet/glow
 
 source:
   type: github_release
@@ -63,7 +68,8 @@ source:
 #
 # ─── Archive layout: WRAPPER DIRECTORY on every platform ───────────────────
 #
-# Identical shape to charm/gum — both come off the same goreleaser config.
+# Identical shape to charmbracelet/gum — both come off the same goreleaser
+# config.
 # Every archive wraps seven entries in ONE top directory named
 # `glow_<version>_<Os>_<arch>`. Verified on 2.0.0, 2.1.0, 2.1.1, 2.1.2 and
 # 3.0.0, i.e. across the v3 major bump and one release BELOW the floor:
@@ -156,12 +162,13 @@ versions:
   min: "2.1.0"
   new_per_run: 5
   # Hash-staggered, never a hand-picked minute:
-  #   $ python3 .claude/skills/create-mirror/scripts/poll_stagger.py charm/glow
-  #   slot: 29  (minute=29, hour-offset=0)   cron: 29 0-23/6 * * *
-  # Note this lands in a different 6h slot than charm/gum's `26 4-23/6` — the
-  # stagger is per-package precisely so two packages in one repo never push to
-  # GHCR together.
-  poll_interval: "29 0-23/6 * * *"
+  #   $ python3 .claude/skills/create-mirror/scripts/poll_stagger.py charmbracelet/glow
+  #   slot: 92  (minute=32, hour-offset=1)   cron: 32 1-23/6 * * *
+  # Note this lands in a different 6h slot than charmbracelet/gum's
+  # `38 0-23/6` — the stagger is per-package precisely so two packages in one
+  # repo never push to GHCR together. The slot is a hash of the LOGICAL PACKAGE
+  # NAME, so the namespace rename moved it; recomputed, not carried over.
+  poll_interval: "32 1-23/6 * * *"
 
 tests:
   # `script:` resolves from the REPOSITORY ROOT — unlike `metadata.default` and
@@ -176,5 +183,5 @@ annotations:
   org.opencontainers.image.licenses: "MIT"
 
 announce:
-  package: charm/glow
+  package: charmbracelet/glow
   fork: ocx-contrib/index

@@ -1,8 +1,12 @@
 # Shared base for every spec in this repository — the CLI tools published by
-# Charm (charm.sh), the vendor behind Bubble Tea and Lip Gloss. The GitHub org
-# handle is `charmbracelet`; the vendor calls itself Charm, and the vendor
-# identity is what the namespace carries (skill Phase 1 rule 3, the same reason
-# `github/cli` is not `cli/cli` and `amazon/corretto` is not `corretto/…`).
+# Charm (charm.sh), the vendor behind Bubble Tea and Lip Gloss, under the
+# GitHub org `charmbracelet`.
+#
+# The namespace is the ORG HANDLE, not the shorter vendor brand `charm`. The
+# vendor-beats-handle rule would argue for `charm`, but the index namespace
+# policy prefers an identity the vendor demonstrably holds and
+# `github.com/charm` belongs to an unrelated dormant org — the full transcript
+# is above gum/mirror.yml's `target:`.
 #
 # NOT a spec: it has no name/target/source and is never loaded on its own.
 # Everything a package owns — name, target, source, assets, asset_type,

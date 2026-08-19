@@ -6,7 +6,7 @@ name: gum
 
 on:
   schedule:
-    - cron: '26 4-23/6 * * *'
+    - cron: '38 0-23/6 * * *'
   workflow_dispatch:
   push:
     branches: [main]
@@ -328,15 +328,15 @@ jobs:
               RC=0
               if [ "${TEST_KIND}" = "command" ]; then
                 TEST_CMD=$(echo "${TESTS_JSON}" | jq -r ".[$i].command")
-                ocx_test package test --platform "${{ matrix.platform }}" --identifier "ghcr.io/ocx-contrib/charm/gum:${VERSION}" "${BUNDLE}" -- \
+                ocx_test package test --platform "${{ matrix.platform }}" --identifier "ghcr.io/ocx-contrib/charmbracelet/gum:${VERSION}" "${BUNDLE}" -- \
                   ${{ matrix.shell }} -c "${TEST_CMD}" || RC=$?
               elif [ "${TEST_KIND}" = "script" ]; then
                 TEST_SCRIPT=$(echo "${TESTS_JSON}" | jq -r ".[$i].script")
-                ocx_test package test --platform "${{ matrix.platform }}" --identifier "ghcr.io/ocx-contrib/charm/gum:${VERSION}" "${BUNDLE}" \
+                ocx_test package test --platform "${{ matrix.platform }}" --identifier "ghcr.io/ocx-contrib/charmbracelet/gum:${VERSION}" "${BUNDLE}" \
                   --script "${TEST_SCRIPT}" || RC=$?
               else
                 TEST_INLINE=$(echo "${TESTS_JSON}" | jq -r ".[$i].script_inline")
-                printf '%s' "${TEST_INLINE}" | ocx_test package test --platform "${{ matrix.platform }}" --identifier "ghcr.io/ocx-contrib/charm/gum:${VERSION}" "${BUNDLE}" \
+                printf '%s' "${TEST_INLINE}" | ocx_test package test --platform "${{ matrix.platform }}" --identifier "ghcr.io/ocx-contrib/charmbracelet/gum:${VERSION}" "${BUNDLE}" \
                   --script - || RC=$?
               fi
               END=$(date +%s)

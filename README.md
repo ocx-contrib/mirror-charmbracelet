@@ -1,22 +1,27 @@
-# mirror-charm
+# mirror-charmbracelet
 
 OCX mirrors for the CLI tools published by [Charm](https://charm.sh)
 (`charmbracelet` on GitHub). One repository, one spec directory per package.
 
 | Package | Spec | Publishes to | Announced as | Upstream SPDX |
 |---|---|---|---|---|
-| [gum](https://github.com/charmbracelet/gum) | [`gum/mirror.yml`](gum/mirror.yml) | `ghcr.io/ocx-contrib/charm/gum` | [`ocx.sh/charm/gum`](https://index.ocx.sh/charm/gum) | `MIT` |
-| [glow](https://github.com/charmbracelet/glow) | [`glow/mirror.yml`](glow/mirror.yml) | `ghcr.io/ocx-contrib/charm/glow` | [`ocx.sh/charm/glow`](https://index.ocx.sh/charm/glow) | `MIT` |
+| [gum](https://github.com/charmbracelet/gum) | [`gum/mirror.yml`](gum/mirror.yml) | `ghcr.io/ocx-contrib/charmbracelet/gum` | [`ocx.sh/charmbracelet/gum`](https://index.ocx.sh/charmbracelet/gum) | `MIT` |
+| [glow](https://github.com/charmbracelet/glow) | [`glow/mirror.yml`](glow/mirror.yml) | `ghcr.io/ocx-contrib/charmbracelet/glow` | [`ocx.sh/charmbracelet/glow`](https://index.ocx.sh/charmbracelet/glow) | `MIT` |
 
 Each upstream release is discovered, re-bundled, smoke-tested per
 `(version, platform)` and only then pushed with cascade tags, after which the
 result is announced into the OCX index.
 
-The namespace is **`charm`, not `charmbracelet`**: the vendor calls itself
-Charm (charm.sh / charm.land) and brands the tool `charm_ gum` in its own
-artwork; `charmbracelet` is only the handle it registered on GitHub. Same rule
-that makes `github/cli` not `cli/cli`. Provenance is not lost by that — it is
-recorded verifiably in each index claim's `upstream` block.
+The namespace is **`charmbracelet`, not `charm`** — and that is a deliberate
+reversal of the usual vendor-beats-handle rule. Charm calls itself Charm, holds
+charm.sh and charm.land, and brands the tool `charm_ gum` in its own artwork,
+which is exactly the argument that makes `github/cli` not `cli/cli`. But the
+index's namespace policy prefers a namespace matching an identity the vendor
+demonstrably holds, and `github.com/charm` is an unrelated dormant org (created
+2018, four repos, none of them Charm's). Every fleet precedent for the rule
+names a handle its vendor actually owns, so the org handle wins here. Branding
+and provenance are not lost — they are in each claim's `upstream` block and in
+the catalogs.
 
 **`crush` is deliberately not mirrored here.** It ships under `FSL-1.1-MIT`,
 which grants redistribution only for a non-competing "Permitted Purpose"; that
@@ -89,7 +94,7 @@ ocx-mirror package pipeline prepare --spec gum/mirror.yml \
   --version 0.17.0 --work-dir "$(mktemp -d)"
 # bundle lands at <work-dir>/<V>_<YYYYMMDD>/linux_amd64/ under build_timestamp: date
 ocx package test --platform linux/amd64 \
-  --identifier ghcr.io/ocx-contrib/charm/gum:0.17.0 \
+  --identifier ghcr.io/ocx-contrib/charmbracelet/gum:0.17.0 \
   <work-dir>/<V>_<YYYYMMDD>/linux_amd64/bundle.tar.xz \
   --script gum/tests/smoke.star
 ```
@@ -134,7 +139,7 @@ architecture.
 
 ## Claim + announce
 
-The index claim (`p/charm/gum.json` and `p/charm/glow.json` in `ocx-sh/index`)
+The index claim (`p/charmbracelet/gum.json` and `p/charmbracelet/glow.json` in `ocx-sh/index`)
 is the one PR in this workflow; **mirror repos themselves take no PRs — push
 straight to `main`**. Order is publish → verify the GHCR package is public →
 merge the claim → announce:

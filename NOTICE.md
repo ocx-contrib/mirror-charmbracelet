@@ -8,8 +8,8 @@ own license, recorded below.
 
 | Package | GHCR path | Upstream SPDX |
 |---|---|---|
-| `gum` | `ghcr.io/ocx-contrib/charm/gum` | `MIT` |
-| `glow` | `ghcr.io/ocx-contrib/charm/glow` | `MIT` |
+| `gum` | `ghcr.io/ocx-contrib/charmbracelet/gum` | `MIT` |
+| `glow` | `ghcr.io/ocx-contrib/charmbracelet/glow` | `MIT` |
 
 The package logos are **original marks authored for this repository**, not
 upstream assets. Charm publishes no SVG logo for either tool — a listing of
@@ -25,7 +25,7 @@ claim is made.
 ## `gum`
 
 Upstream: <https://github.com/charmbracelet/gum>
-Published to `ghcr.io/ocx-contrib/charm/gum`.
+Published to `ghcr.io/ocx-contrib/charmbracelet/gum`.
 
 | Component | SPDX | Holder |
 |---|---|---|
@@ -41,7 +41,7 @@ $ gh api repos/charmbracelet/gum/license --jq '{spdx: .license.spdx_id, name: .l
 ## `glow`
 
 Upstream: <https://github.com/charmbracelet/glow>
-Published to `ghcr.io/ocx-contrib/charm/glow`.
+Published to `ghcr.io/ocx-contrib/charmbracelet/glow`.
 
 | Component | SPDX | Holder |
 |---|---|---|
